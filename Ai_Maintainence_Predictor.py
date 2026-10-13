@@ -10,7 +10,7 @@ import plotly.express as px
 # PAGE CONFIG
 # --------------------------------------------------
 st.set_page_config(
-    page_title="AI Predictive Maintenance Platform",
+    page_title="NASA Turbofan Predictive Maintenance AI",
     layout="wide",
     page_icon="⚙"
 )
@@ -59,7 +59,7 @@ rf, iso, feature_cols = load_models()
 # HEADER
 # --------------------------------------------------
 st.markdown("""
-<h1 style='text-align:center;'>⚙ AI-Driven Predictive Maintenance Control Center</h1>
+<h1 style='text-align:center;'>⚙ NASA Turbofan Predictive Maintenance Control Center</h1>
 <p style='text-align:center;color:#9aa4b2;'>Real-Time Degradation Monitoring • Failure Forecasting • Anomaly Intelligence</p>
 """, unsafe_allow_html=True)
 

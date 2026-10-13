@@ -1,4 +1,4 @@
-# ⚙ AI-Driven Predictive Maintenance System for Industrial Equipment
+# ⚙ NASA Turbofan Predictive Maintenance AI: RUL & Anomaly Forecasting
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
@@ -120,8 +120,8 @@ The dashboard ([Ai_Maintainence_Predictor.py](file:///c:/Users/Admin/Desktop/Int
 
 ### 2. Clone the Repository & Pull Models
 ```bash
-git clone https://github.com/<your-username>/ai-predictive-maintenance.git
-cd ai-predictive-maintenance
+git clone https://github.com/<your-username>/nasa-turbofan-predictive-maintenance-ai.git
+cd nasa-turbofan-predictive-maintenance-ai
 
 # Pull model weights tracked by Git LFS
 git lfs install
