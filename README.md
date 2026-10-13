@@ -1,113 +1,142 @@
-# ⚙ NASA Turbofan Predictive Maintenance AI: RUL & Anomaly Forecasting
+# ⚙ NASA Turbofan Predictive Maintenance AI
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-1.4%2B-F7931E.svg?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
-[![Plotly](https://img.shields.io/badge/Plotly-Interactive%20Charts-3F4F75.svg?logo=plotly&logoColor=white)](https://plotly.com/)
+[![Plotly](https://img.shields.io/badge/Plotly-Interactive%20Visualizations-3F4F75.svg?logo=plotly&logoColor=white)](https://plotly.com/)
+[![CI Pipeline](https://github.com/Vedant04-tech/nasa-turbofan-predictive-maintenance-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Vedant04-tech/nasa-turbofan-predictive-maintenance-ai/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests: Passing](https://img.shields.io/badge/Tests-4%2F4%20Passing-brightgreen.svg)]()
 
-> **Real-Time Degradation Monitoring • Failure Forecasting • Anomaly Intelligence**  
-> An industrial AI/ML solution combining **supervised Remaining Useful Life (RUL) regression** and **unsupervised Isolation Forest anomaly detection** deployed through an interactive **Streamlit Enterprise Control Center**.
+> **Industrial Prognostics & Health Management (PHM)**: A modular machine learning system combining **supervised Remaining Useful Life (RUL) regression** and **unsupervised Isolation Forest anomaly intelligence**, served via an interactive **Streamlit Control Center**.
 
 ---
 
-## 📌 Executive Overview
+## 📌 Problem Statement & Objectives
 
-Unplanned equipment downtime and catastrophic rotating machinery breakdowns incur significant financial and operational losses across aerospace, manufacturing, and heavy industry. Traditional maintenance paradigms—reactive breakdown repair and rigid calendar-based inspections—are either too late or needlessly expensive.
+In safety-critical aerospace and industrial rotating machinery, unplanned failures cause severe operational disruption, emergency repair costs, and safety risks. Conversely, rigid calendar-based maintenance schedules often replace healthy components prematurely.
 
-This system leverages multivariate sensor streams to provide an end-to-end predictive health monitoring platform:
-- **Remaining Useful Life (RUL) Estimation**: Forecasts the remaining cycles until failure using an ensemble **Random Forest Regressor**.
-- **Anomaly Detection & Outlier Profiling**: Detects early deviation from normal operation using an **Isolation Forest** trained strictly on healthy operating regimes ($RUL > 100$).
-- **Dynamic Sensitivity Tuning**: An interactive threshold slider links risk indicators, gauge meters, and early warning lead time calculations in real-time.
-- **Early Warning Lead Time**: Consistently detects emerging degradation patterns **~40–46 cycles prior to breakdown**, empowering maintenance teams to plan part replacements proactively.
+This project implements a predictive maintenance system on multivariate turbofan engine sensor telemetry to:
+1. **Estimate Remaining Useful Life (RUL)**: Accurately forecast remaining operational cycles using ensemble regression.
+2. **Detect Early Sensor Anomalies**: Identify subtle sensor drift away from baseline nominal behavior before catastrophic breakdown.
+3. **Calculate Early Warning Lead Times**: Measure operational warning windows to support condition-based maintenance planning.
+4. **Provide an Interactive Diagnostics Interface**: Enable maintenance engineers to explore fleet telemetry, inspect anomaly progressions, and test custom flight datasets.
 
 ---
 
 ## 🏛 System Architecture
 
-The solution uses a **dual-model framework** designed to prevent data leakage and decouple normal behavior from degradation stages:
+The project is structured as a modular Python package (`turbofan_ai`) with decoupled data preparation, model inference, prognostic evaluation, and presentation layers:
 
 ```mermaid
 flowchart TD
-    A["Raw C-MAPSS Sensor Streams (21 Sensors, 3 Ops)"] --> B["Data Cleaning & Preprocessing"]
-    B --> C["Remove Low-Variance Sensors"]
-    C --> D["Feature Engineering (Rolling Mean & Std, Window=5)"]
-    D --> E["RUL Capping (Threshold = 130 Cycles)"]
+    A["Raw C-MAPSS Sensor Streams (21 Sensors, 3 Ops)"] --> B["Data Validation & Sanity Checks"]
+    B --> C["Drop Near-Zero Variance Sensors"]
+    C --> D["Causal Feature Engineering (Rolling Mean & Std, w=5)"]
+    D --> E["Piecewise Linear RUL Target Formulation"]
     
-    E --> F["Engine-Level Chronological Split"]
+    E --> F["Engine-Level Training Split"]
     F --> G["Supervised Stream: Random Forest Regressor"]
     F --> H["Unsupervised Stream: Healthy Regime Filter (RUL > 100)"]
     H --> I["Isolation Forest Anomaly Model"]
     
     G --> J["Predicted RUL Trajectory"]
-    I --> K["Cycle Anomaly Score & Dynamic Thresholding"]
+    I --> K["Cycle Anomaly Score & Dynamic Sensitivity Boundary"]
     
-    J --> L["Streamlit Enterprise Control Center"]
+    J --> L["Streamlit Control Center (app.py)"]
     K --> L
-    L --> M["Real-Time Gauge, Lead-Time Alerts & Incident Table"]
+    L --> M["Gauges, Lead-Time Alerts, Sensor Analytics & CSV Export"]
 ```
 
 ---
 
-## 📊 Dataset & Feature Engineering Strategy
+## 📊 Dataset & Limitations
 
-The platform is built on the benchmark **NASA Commercial Modular Aero-Propulsion System Simulation (C-MAPSS)** turbofan degradation dataset (`FD001`):
-- **100 Turbofan Engines** tracked across continuous operational flights until system failure.
-- **21 Sensor Signals** measuring temperatures, pressures, fan speeds, bypass ratios, and bleed fractions.
-- **3 Operational Setting Variables** reflecting throttle and flight condition parameters.
+The system is trained and benchmarked on the canonical **NASA Commercial Modular Aero-Propulsion System Simulation (C-MAPSS)** dataset (`FD001`):
+- **Simulation Conditions**: Sea-level single operational regime.
+- **Fault Mode**: High-Pressure Compressor (HPC) degradation.
+- **Fleet Size**: 100 turbofan engines simulated from nominal state to run-to-failure breakdown.
+- **Sensor Channels**: 21 raw sensor measurements (temperatures, pressures, fan speeds, bypass ratios) and 3 operating settings.
 
-### Engineering Pipeline:
-1. **Variance Filtering**: Dropped flat sensors with near-zero variance across operating lifespans.
-2. **Degradation Feature Extraction**: Computed **rolling means** and **rolling standard deviations** ($window = 5$) grouped per engine (`id`) to preserve physical causality and eliminate group leakage.
-3. **RUL Target Formulation**: Formulated piecewise linear remaining useful life, capped at **130 cycles** (`RUL_CAP = 130`) to model constant healthy initial wear before nonlinear degradation initiates.
+### Dataset Limitations:
+- **Simulation vs. Flight Reality**: C-MAPSS data is generated by thermodynamic simulation models; real-world engines experience external weather variability, fluctuating flight envelopes, and diverse maintenance histories.
+- **Single Fault Mode (`FD001`)**: The model is trained on compressor degradation. Multimodal failures (e.g., turbine blade cracks or bearing failures in sub-datasets `FD002`–`FD004`) require multi-regime normalization.
+- **Run-to-Failure vs. In-Service Censoring**: In `FD001`, each engine runs until catastrophic failure. Real industrial operating data is right-censored because maintenance teams overhaul engines before failure occurs.
 
 ---
 
-## 📈 Model Performance & Evaluation
+## ⚙️ Feature Engineering & Target Formulation
 
-| Model Architecture | Task | RMSE | MAE | Notes |
+1. **Variance Filtering**: Dropped 7 flat sensor channels with near-zero standard deviation across engine lifespans (`sensor_1`, `sensor_5`, `sensor_6`, `sensor_10`, `sensor_16`, `sensor_18`, `sensor_19`).
+2. **Causal Rolling Statistics**: Computed backward-looking rolling mean and rolling standard deviation over a 5-cycle window ($w = 5$, `min_periods=1`) grouped strictly by engine ID (`id`). This guarantees:
+   - **No Lookahead Leakage**: Only historical and current cycles are used for feature computation.
+   - **No Cross-Engine Leakage**: Grouping by engine ID prevents statistics from bleeding across different engines.
+   - **Full Cycle Coverage**: `min_periods=1` allows immediate inference from cycle 1 without dropping early records.
+3. **Piecewise Linear RUL Target**: During early cycles, degradation is undetectable. The RUL target is capped at 125 cycles:
+   $$\text{RUL}(t) = \min(\text{MaxCycle} - t, 125)$$
+   This prevents regressor bias from fitting noise during healthy operating periods.
+4. **Final Feature Schema**: 29 input features (14 informative sensors, 3 operating settings, 12 rolling statistics).
+
+---
+
+## 📈 Model Evaluation & Benchmarks
+
+Models were evaluated on a held-out test split of engine units to assess generalization to unseen machinery:
+
+| Model Architecture | Task | RMSE | MAE | Operational Role |
 | :--- | :--- | :---: | :---: | :--- |
-| **Linear Regression** (Baseline) | RUL Regression | 21.17 | 17.03 | Underfits nonlinear wear stages |
-| **Random Forest Regressor** (Production) | RUL Regression | **17.90** | **12.85** | **~15% lower RMSE**, captures nonlinear degradation |
-| **Isolation Forest** | Anomaly Intelligence | Contamination = 5% | — | Trained exclusively on healthy cycles ($RUL > 100$) |
+| **Linear Regression** (Baseline) | RUL Regression | 21.17 | 17.03 | Benchmark baseline; underfits nonlinear degradation stages |
+| **Random Forest Regressor** (100 Trees) | RUL Regression | **17.90** | **12.85** | Production regressor; ~15% error reduction over baseline |
+| **Isolation Forest** (Contamination = 5%) | Anomaly Detection | — | — | Unsupervised safety net trained strictly on nominal cycles ($RUL > 100$) |
 
-### Key Operational Milestones:
-- **Prediction Accuracy**: Random Forest regressor closely tracks actual degradation along the diagonal axis.
-- **Early Warning Lead Time**: First anomaly flags consistently occur **~40 cycles before failure**, providing optimal lead time for maintenance dispatch.
-
----
-
-## 🖥 Streamlit Enterprise Control Center
-
-The dashboard ([Ai_Maintainence_Predictor.py](file:///c:/Users/Admin/Desktop/Internship%20Project/Ai_Maintainence_Predictor.py)) features:
-- **Executive Metric Cards**: Real-time display of Predicted RUL, Current Anomaly Score, Early Warning Lead Time, and System Health Status.
-- **Anomaly Risk Meter (Plotly Gauge)**: Live visual indicator dynamically highlighted in red/green based on the active sensitivity threshold.
-- **Degradation Trend Graphs**: Interactive time-series comparing RUL degradation and anomaly progression curves.
-- **Sensitivity Threshold Slider**: Live slider ($-0.5$ to $+0.5$) with instantaneous cache-accelerated re-evaluation of anomaly events and lead time.
-- **Detected Anomaly Audit Table**: Detailed cycle-by-cycle breakdown of flagged anomaly timestamps.
+### Prognostic Semantics & Lead-Time Nuances:
+- **Run-to-Failure Datasets**: When evaluated on run-to-failure benchmarks, the lead time represents the number of cycles from the first anomaly trigger until functional breakdown (typically ~40–46 cycles prior to failure).
+- **In-Service Data**: On right-censored operating machinery that has not yet failed, this interval represents the **observed monitoring duration since initial anomaly trigger**, rather than a guaranteed time-to-failure estimate.
 
 ---
 
 ## 📁 Repository Structure
 
 ```text
-├── .gitattributes                # Git LFS configuration for large model files (*.pkl)
-├── .gitignore                    # Git exclusions (virtualenvs, caches, temporary files)
-├── Ai_Maintainence_Predictor.py  # Streamlit Production Application & Control Center
-├── requirements.txt              # Core runtime dependencies
-├── test_predictor.py             # Pytest automated test suite & Streamlit AppTests
-├── engine_samples.csv            # Clean sample engine dataset for instant demo
-├── #engine_samples.csv           # Benchmark engine dataset
-├── rul_model.pkl                 # Pre-trained Random Forest Regressor (tracked via LFS)
-├── anomaly_model.pkl             # Pre-trained Isolation Forest Model (tracked via LFS)
-├── feature_cols.pkl              # Serialized feature column specification
-├── Supported Files/
-│   ├── Anamoly_Detection.ipynb   # Model training, exploratory analysis & experiments
-│   ├── train_FD001.txt           # NASA C-MAPSS raw training data
-│   ├── Internship Project PPT.pdf# Executive presentation document
+nasa-turbofan-predictive-maintenance-ai/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # Multi-OS / multi-Python CI pipeline (lint + test)
+├── data/
+│   ├── raw/
+│   │   └── train_FD001.txt       # Benchmark NASA C-MAPSS FD001 dataset
+│   └── samples/
+│       └── engine_samples.csv    # Canonical multi-engine sample dataset for dashboard demo
+├── docs/
+│   ├── Internship Project PPT.pdf   # Project presentation
 │   └── Internship Project PPT.pptx
-└── README.md                     # Project documentation
+├── models/
+│   ├── rul_model.pkl             # Trained Random Forest Regressor (tracked via Git LFS)
+│   ├── anomaly_model.pkl         # Trained Isolation Forest Detector (tracked via Git LFS)
+│   └── feature_cols.pkl          # Serialized feature column schema (29 features)
+├── notebooks/
+│   └── Anamoly_Detection.ipynb   # Exploratory analysis, feature engineering & model training
+├── src/
+│   └── turbofan_ai/              # Core production package
+│       ├── __init__.py           # Package exports and version
+│       ├── data.py               # Data validation, cleaning, and causal rolling features
+│       ├── models.py             # Artifact deserialization, inference, and physical constraints
+│       └── evaluation.py         # Prognostic metrics and lead-time calculations
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py               # Shared test fixtures and synthetic data generators
+│   ├── test_data.py              # Tests for schema validation, rolling features, inf/nan handling
+│   ├── test_models.py            # Tests for artifact loading, RUL non-negativity, anomaly thresholds
+│   ├── test_evaluation.py        # Tests for RMSE, MAE, R^2, and lead-time semantics
+│   └── test_app.py               # Headless Streamlit AppTest suite (UI, sliders, error handling)
+├── .gitattributes                # Git LFS tracking configuration for *.pkl files
+├── .gitignore                    # Python, pytest, and OS ignore rules
+├── app.py                        # Canonical Streamlit Control Center application
+├── Ai_Maintainence_Predictor.py  # Backward-compatible wrapper delegating to app.py
+├── pyproject.toml                # PEP 517/518 build specification, ruff & pytest configuration
+├── requirements.txt              # Core runtime dependencies
+├── requirements-dev.txt          # Development, testing, and linting dependencies
+├── LICENSE                       # MIT License
+└── README.md                     # Comprehensive project documentation
 ```
 
 ---
@@ -115,69 +144,99 @@ The dashboard ([Ai_Maintainence_Predictor.py](file:///c:/Users/Admin/Desktop/Int
 ## 🚀 Quick Start Guide
 
 ### 1. Prerequisites
-- **Python 3.10+**
-- **Git** with **Git LFS** installed ([git-lfs.com](https://git-lfs.github.com/))
+- **Python**: Version 3.10, 3.11, or 3.12 recommended.
+- **Git & Git LFS**: Ensure Git Large File Storage is installed ([git-lfs.github.com](https://git-lfs.github.com/)).
 
-### 2. Clone the Repository & Pull Models
+### 2. Clone the Repository & Pull Model Artifacts
 ```bash
-git clone https://github.com/<your-username>/nasa-turbofan-predictive-maintenance-ai.git
+git clone https://github.com/Vedant04-tech/nasa-turbofan-predictive-maintenance-ai.git
 cd nasa-turbofan-predictive-maintenance-ai
 
-# Pull model weights tracked by Git LFS
+# Initialize Git LFS and download serialized model files
 git lfs install
 git lfs pull
 ```
 
 ### 3. Set Up Virtual Environment
 ```bash
-# Create virtual environment
-python -m venv .venv
-
-# Activate on Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# Or on macOS/Linux:
+# On Linux / macOS:
+python3 -m venv .venv
 source .venv/bin/activate
+
+# On Windows (PowerShell):
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 ```
 
 ### 4. Install Dependencies
 ```bash
+# Production runtime:
 pip install -r requirements.txt
+
+# Development and testing tools:
+pip install -r requirements-dev.txt
+
+# (Optional) Install the turbofan_ai package in editable mode:
+pip install -e .
 ```
 
 ### 5. Launch the Dashboard
 ```bash
-streamlit run Ai_Maintainence_Predictor.py
+streamlit run app.py
 ```
-1. Open the local URL displayed in your terminal (typically `http://localhost:8501`).
-2. In the sidebar, click **"Upload Engine Dataset"** and select `engine_samples.csv`.
-3. Select an engine ID from the dropdown and interactively tune the **Anomaly Sensitivity Threshold**.
+> *Backward-compatibility notice*: Running `streamlit run Ai_Maintainence_Predictor.py` is also fully supported.
+
+1. Open your browser at `http://localhost:8501`.
+2. Choose **"Load Benchmark Sample Dataset"** for instant demonstration or **"Upload Custom CSV"** to test your own data.
+3. Select an Engine Unit ID and interactively adjust the **Anomaly Sensitivity Threshold** slider to evaluate risk shifts.
 
 ---
 
-## 🧪 Automated Testing
+## 🧪 Testing & Code Quality
 
-The project includes an automated test suite verifying model deserialization, feature schema integrity, mathematical threshold reactivity, and headless Streamlit AppTest UI validation:
+The project includes 23 automated tests covering data validation, artifact integrity, physical regression bounds, prognostic lead times, and interactive Streamlit UI components:
 
 ```bash
-# Run pytest verification suite
-pytest test_predictor.py -v
+# Run full pytest suite
+pytest tests/ -v
+
+# Run with test coverage report
+pytest tests/ --cov=turbofan_ai --cov-report=term-missing
+
+# Run code style & linting checks
+ruff check .
 ```
 
-Output:
+### Verified Test Summary:
 ```text
-test_predictor.py::test_models_exist_and_loadable PASSED                 [ 25%]
-test_predictor.py::test_dataset_and_feature_columns_match PASSED         [ 50%]
-test_predictor.py::test_threshold_reactivity_logic PASSED                [ 75%]
-test_predictor.py::test_app_test_slider_reactivity PASSED                [100%]
-======================= 4 passed in 25s =======================
+tests/test_app.py::test_app_initialization_with_demo_dataset PASSED       [ 13%]
+tests/test_app.py::test_app_slider_reactivity_and_filtering PASSED        [ 21%]
+tests/test_app.py::test_app_handles_invalid_csv_gracefully PASSED         [ 30%]
+tests/test_data.py::test_compute_rolling_features_causality PASSED        [ 39%]
+tests/test_data.py::test_validate_and_prepare_data_valid_sample PASSED    [ 47%]
+tests/test_data.py::test_validate_and_prepare_data_auto_rolling_derivation PASSED [ 56%]
+tests/test_data.py::test_validate_and_prepare_data_empty PASSED           [ 65%]
+tests/test_data.py::test_validate_and_prepare_data_missing_metadata PASSED [ 73%]
+tests/test_data.py::test_validate_and_prepare_data_non_numeric_metadata PASSED [ 82%]
+tests/test_data.py::test_validate_and_prepare_data_missing_features_unsolvable PASSED [ 91%]
+tests/test_data.py::test_validate_and_prepare_data_inf_and_nan_imputation PASSED [100%]
+...
+============================= 23 passed in 29.5s =============================
 ```
 
 ---
 
-## 🎓 Academic Credits & Acknowledgements
+## 🔒 Known Limitations & Future Work
 
-- **Developer**: Vedant Bhaskar Porje
-- **Department**: Department of Computer Engineering
-- **Institution**: PES Modern College of Engineering, Savitribai Phule Pune University (SPPU)
-- **Academic Guidance**: Prof. Mrs. Mayuri A. Khade
-- **Benchmark Dataset**: NASA Prognostics Data Repository (C-MAPSS Turbofan Simulation)
+1. **Deep Learning Sequence Modeling**: Replacing flat rolling features with temporal deep learning architectures (e.g., Temporal Convolutional Networks [TCN] or BiLSTM/Transformers) to learn degradation trajectories over varying sequence lengths.
+2. **Multi-Condition Normalization**: Extending preprocessing pipelines to C-MAPSS sub-datasets `FD002` and `FD004` that feature 6 operating conditions and multiple failure modes.
+3. **Uncertainty Quantification**: Incorporating Conformal Prediction or Quantile Regression Forests to output calibrated confidence bounds around RUL predictions ($RUL \pm \delta$) for safety-critical maintenance decisions.
+4. **API Serving**: Exposing FastAPI endpoints with OpenAPI specifications for headless microservice deployment in Kubernetes environments.
+
+---
+
+## 📄 License & Credits
+
+- **License**: Released under the [MIT License](LICENSE).
+- **Author**: Vedant Bhaskar Porje
+- **Dataset Source**: NASA Ames Prognostics Center of Excellence (PCoE) Turbofan Engine Degradation Simulation Dataset.
