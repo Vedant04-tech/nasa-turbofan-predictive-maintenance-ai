@@ -131,7 +131,6 @@ nasa-turbofan-predictive-maintenance-ai/
 ├── .gitattributes                # Git LFS tracking configuration for *.pkl files
 ├── .gitignore                    # Python, pytest, and OS ignore rules
 ├── app.py                        # Canonical Streamlit Control Center application
-├── Ai_Maintainence_Predictor.py  # Backward-compatible wrapper delegating to app.py
 ├── pyproject.toml                # PEP 517/518 build specification, ruff & pytest configuration
 ├── requirements.txt              # Core runtime dependencies
 ├── requirements-dev.txt          # Development, testing, and linting dependencies
@@ -184,7 +183,6 @@ pip install -e .
 ```bash
 streamlit run app.py
 ```
-> *Backward-compatibility notice*: Running `streamlit run Ai_Maintainence_Predictor.py` is also fully supported.
 
 1. Open your browser at `http://localhost:8501`.
 2. Choose **"Load Benchmark Sample Dataset"** for instant demonstration or **"Upload Custom CSV"** to test your own data.

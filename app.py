@@ -71,9 +71,6 @@ st.markdown(
     .status-normal {
         color: #22c55e !important;
     }
-    .status-warning {
-        color: #f59e0b !important;
-    }
     .status-critical {
         color: #ef4444 !important;
     }

@@ -55,4 +55,4 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
-per-file-ignores = { "app.py" = ["E402"], "Ai_Maintainence_Predictor.py" = ["E402"], "tests/conftest.py" = ["E402"] }
+per-file-ignores = { "app.py" = ["E402"], "tests/conftest.py" = ["E402"] }
