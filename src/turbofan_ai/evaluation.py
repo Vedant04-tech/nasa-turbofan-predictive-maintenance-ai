@@ -53,17 +53,18 @@ def calculate_early_warning_lead_time(
     threshold: float = 0.0,
     score_col: str = "Anomaly_Score",
     cycle_col: str = "cycle",
+    is_run_to_failure: bool = False,
 ) -> Dict[str, Any]:
     """
-    Calculates the early warning lead time relative to the maximum recorded cycle.
+    Calculates the warning window relative to the maximum observed cycle.
 
-    Important Semantic Note:
-    -----------------------
-    In run-to-failure datasets (such as NASA C-MAPSS FD001 training data), the maximum
-    recorded cycle corresponds to the actual functional breakdown point. In in-service
-    or right-censored industrial streaming data where failure has not yet occurred, this
-    metric represents the elapsed monitoring interval between the initial warning trigger
-    and the latest recorded cycle, not a confirmed time-to-failure estimate.
+    Important Prognostic Distinction:
+    ---------------------------------
+    In run-to-failure benchmarks (such as NASA C-MAPSS FD001), the terminal cycle represents
+    an actual functional failure, making this interval a true failure lead time.
+    For in-service or right-censored operating telemetry where failure has not occurred,
+    the true failure cycle is unknown. In that case, this metric represents an observed
+    detection window since the initial anomaly, not a confirmed time-to-failure estimate.
 
     Parameters
     ----------
@@ -75,25 +76,31 @@ def calculate_early_warning_lead_time(
         Name of the anomaly score column (default: 'Anomaly_Score').
     cycle_col : str, optional
         Name of the cycle sequence column (default: 'cycle').
+    is_run_to_failure : bool, optional
+        Whether the telemetry represents a confirmed run-to-failure sequence (default: False).
 
     Returns
     -------
     Dict[str, Any]
         {
             'lead_time': int,
+            'observed_interval': int,
             'first_anomaly_cycle': Optional[int],
             'max_cycle': int,
             'anomaly_count': int,
-            'is_anomalous': bool
+            'is_anomalous': bool,
+            'is_run_to_failure': bool,
         }
     """
     if engine_df is None or engine_df.empty:
         return {
             "lead_time": 0,
+            "observed_interval": 0,
             "first_anomaly_cycle": None,
             "max_cycle": 0,
             "anomaly_count": 0,
             "is_anomalous": False,
+            "is_run_to_failure": is_run_to_failure,
         }
 
     # Support case-insensitive score column
@@ -113,14 +120,16 @@ def calculate_early_warning_lead_time(
 
     has_anomaly = not anomaly_points.empty
     first_anomaly = int(anomaly_points[cycle_col].min()) if has_anomaly else None
-    lead_time = max(0, max_cycle - first_anomaly) if first_anomaly is not None else 0
+    interval = max(0, max_cycle - first_anomaly) if first_anomaly is not None else 0
 
     return {
-        "lead_time": lead_time,
+        "lead_time": interval,
+        "observed_interval": interval,
         "first_anomaly_cycle": first_anomaly,
         "max_cycle": max_cycle,
         "anomaly_count": anomaly_count,
         "is_anomalous": has_anomaly,
+        "is_run_to_failure": is_run_to_failure,
     }
 
 
@@ -128,12 +137,13 @@ def get_anomaly_summary(
     engine_df: pd.DataFrame,
     threshold: float = 0.0,
     score_col: str = "Anomaly_Score",
+    is_run_to_failure: bool = False,
 ) -> Dict[str, Any]:
     """
     Provides a comprehensive anomaly health summary for an engine.
     """
     lead_info = calculate_early_warning_lead_time(
-        engine_df, threshold=threshold, score_col=score_col
+        engine_df, threshold=threshold, score_col=score_col, is_run_to_failure=is_run_to_failure
     )
     col = score_col if score_col in engine_df.columns else "anomaly_score"
     scores = engine_df[col].to_numpy() if col in engine_df.columns else np.array([0.0])

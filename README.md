@@ -207,22 +207,6 @@ pytest tests/ --cov=turbofan_ai --cov-report=term-missing
 ruff check .
 ```
 
-### Verified Test Summary:
-```text
-tests/test_app.py::test_app_initialization_with_demo_dataset PASSED       [ 13%]
-tests/test_app.py::test_app_slider_reactivity_and_filtering PASSED        [ 21%]
-tests/test_app.py::test_app_handles_invalid_csv_gracefully PASSED         [ 30%]
-tests/test_data.py::test_compute_rolling_features_causality PASSED        [ 39%]
-tests/test_data.py::test_validate_and_prepare_data_valid_sample PASSED    [ 47%]
-tests/test_data.py::test_validate_and_prepare_data_auto_rolling_derivation PASSED [ 56%]
-tests/test_data.py::test_validate_and_prepare_data_empty PASSED           [ 65%]
-tests/test_data.py::test_validate_and_prepare_data_missing_metadata PASSED [ 73%]
-tests/test_data.py::test_validate_and_prepare_data_non_numeric_metadata PASSED [ 82%]
-tests/test_data.py::test_validate_and_prepare_data_missing_features_unsolvable PASSED [ 91%]
-tests/test_data.py::test_validate_and_prepare_data_inf_and_nan_imputation PASSED [100%]
-...
-============================= 23 passed in 29.5s =============================
-```
 
 ---
 

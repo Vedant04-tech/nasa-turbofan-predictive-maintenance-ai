@@ -136,10 +136,22 @@ def validate_and_prepare_data(
                 raise ValueError(
                     f"Column '{req}' could not be converted to numeric values: {e}"
                 )
-            if prepared[req].isna().any():
-                raise ValueError(
-                    f"Column '{req}' contains non-numeric or null values."
-                )
+        if not np.isfinite(prepared[req].to_numpy()).all():
+            raise ValueError(
+                f"Column '{req}' contains non-numeric, non-finite, or null values."
+            )
+
+    # Validate valid cycle values (operational cycles must be >= 1)
+    if (prepared["cycle"] < 1).any():
+        raise ValueError("Column 'cycle' contains invalid non-positive cycle values.")
+
+    # Detect duplicate cycle records per engine
+    duplicates = prepared.duplicated(subset=["id", "cycle"])
+    if duplicates.any():
+        dup_count = int(duplicates.sum())
+        raise ValueError(
+            f"Dataset contains {dup_count} duplicate record(s) for the same engine ID and cycle."
+        )
 
     # Sort cycles chronologically per engine
     prepared = prepared.sort_values(by=["id", "cycle"]).reset_index(drop=True)
@@ -165,7 +177,7 @@ def validate_and_prepare_data(
                 f"Dataset schema mismatch: missing required model features: {still_missing}"
             )
 
-        # Validate numeric types and handle nulls / infs in feature matrix
+        # Validate numeric types and finite values in feature matrix
         for col in feature_cols:
             if not pd.api.types.is_numeric_dtype(prepared[col]):
                 try:
@@ -175,15 +187,26 @@ def validate_and_prepare_data(
                         f"Feature '{col}' contains non-numeric values."
                     )
 
-            # Check infinite values
-            inf_mask = np.isinf(prepared[col].to_numpy())
-            if inf_mask.any():
-                prepared[col] = prepared[col].replace([np.inf, -np.inf], np.nan)
-                warnings.append(f"Infinite values in '{col}' were replaced with nulls and imputed.")
+            # Check for infinite values (unphysical sensor readings)
+            if np.isinf(prepared[col].to_numpy()).any():
+                raise ValueError(
+                    f"Feature '{col}' contains infinite values."
+                )
 
-            # Impute any residual nulls (e.g. cycle 1 std)
+            # Check for missing/null values without silent corruption of base sensors
             if prepared[col].isna().any():
-                prepared[col] = prepared[col].fillna(0.0)
-                warnings.append(f"Missing values in '{col}' were imputed with 0.0.")
+                if col.endswith("_rolling_std"):
+                    # Legitimate mathematical edge case: cycle=1 single-sample std is NaN (zero variance)
+                    cycle_1_mask = prepared["cycle"] == 1
+                    nan_mask = prepared[col].isna()
+                    if (nan_mask & ~cycle_1_mask).any():
+                        raise ValueError(
+                            f"Feature '{col}' contains missing or NaN values beyond initial cycle."
+                        )
+                    prepared.loc[nan_mask, col] = 0.0
+                else:
+                    raise ValueError(
+                        f"Feature '{col}' contains missing or NaN values."
+                    )
 
     return prepared, warnings

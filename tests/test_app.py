@@ -35,7 +35,7 @@ def test_app_initialization_with_demo_dataset(app_path):
 
 
 def test_app_slider_reactivity_and_filtering(app_path):
-    """Verify threshold slider interacts with anomaly counts and lead times."""
+    """Verify threshold slider dynamically controls anomaly detections and UI state."""
     at = AppTest.from_file(app_path, default_timeout=30)
     at.run(timeout=30)
     assert not at.exception
@@ -46,16 +46,32 @@ def test_app_slider_reactivity_and_filtering(app_path):
         at.run(timeout=30)
         assert not at.exception
 
-    # Read initial lead time
-    initial_text = " ".join([m.value for m in at.markdown if "Early Warning Lead Time" in m.value])
+    assert at.sidebar.slider, "Threshold slider not found in sidebar"
 
-    # Adjust threshold slider if present
-    if at.sidebar.slider:
-        at.sidebar.slider[0].set_value(-0.05)
-        at.run(timeout=30)
-        assert not at.exception
-        tuned_text = " ".join([m.value for m in at.markdown if "Early Warning Lead Time" in m.value])
-        assert initial_text != tuned_text or len(at.dataframe) >= 0
+    # Set slider to very strict threshold (-0.40) where few/no anomalies are triggered
+    at.sidebar.slider[0].set_value(-0.40)
+    at.run(timeout=30)
+    assert not at.exception
+
+    text_strict = " ".join([m.value for m in at.markdown])
+    assert "Cutoff Boundary: -0.40" in text_strict
+    rows_strict = len(at.dataframe[0].value) if at.dataframe else 0
+
+    # Set slider to sensitive threshold (+0.40) where many anomalies are triggered
+    at.sidebar.slider[0].set_value(0.40)
+    at.run(timeout=30)
+    assert not at.exception
+
+    text_sensitive = " ".join([m.value for m in at.markdown])
+    assert "Cutoff Boundary: +0.40" in text_sensitive
+    assert at.dataframe, "Expected detected anomalies table at sensitive threshold"
+    rows_sensitive = len(at.dataframe[0].value)
+
+    # Increasing sensitivity must strictly detect more anomalies on this non-trivial dataset
+    assert rows_sensitive > rows_strict, (
+        f"Increasing threshold sensitivity should increase flagged anomaly rows: "
+        f"{rows_strict} vs {rows_sensitive}"
+    )
 
 
 def test_app_handles_invalid_csv_gracefully(app_path):

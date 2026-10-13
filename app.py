@@ -239,7 +239,10 @@ def main():
     selected_engine = st.sidebar.selectbox("Select Engine Unit ID", engine_ids)
 
     engine_df = prepared_df[prepared_df["id"] == selected_engine].sort_values("cycle").reset_index(drop=True)
-    summary = get_anomaly_summary(engine_df, threshold=threshold, score_col="Anomaly_Score")
+    is_benchmark = data_source == "Load Benchmark Sample Dataset"
+    summary = get_anomaly_summary(
+        engine_df, threshold=threshold, score_col="Anomaly_Score", is_run_to_failure=is_benchmark
+    )
 
     latest_cycle = summary["max_cycle"]
     latest_rul = float(engine_df["Predicted_RUL"].iloc[-1])
@@ -264,14 +267,23 @@ def main():
         f"Cutoff Boundary: {threshold:+.2f}",
         score_cls,
     )
-    trigger_desc = (
-        f"First Trigger: Cycle #{summary['first_anomaly_cycle']}"
-        if summary["first_anomaly_cycle"]
-        else "No Anomaly Triggered"
+    if summary["first_anomaly_cycle"]:
+        trigger_desc = (
+            f"Trigger: #{summary['first_anomaly_cycle']} (Run-to-failure)"
+            if is_benchmark
+            else f"Trigger: #{summary['first_anomaly_cycle']} (Failure unconfirmed)"
+        )
+    else:
+        trigger_desc = "No Anomaly Triggered"
+
+    lead_title = (
+        "Early Warning Lead Time"
+        if is_benchmark
+        else "Early Warning Lead Time (Observed Window)"
     )
     _render_kpi_card(
         col3,
-        "Early Warning Lead Time",
+        lead_title,
         f"{lead_time} <span style='font-size:16px;color:#94a3b8;'>cycles</span>",
         trigger_desc,
     )
@@ -393,8 +405,9 @@ def main():
         st.plotly_chart(fig_anomaly, width="stretch")
 
         st.caption(
-            "📌 **Lead Time Semantics**: In run-to-failure benchmarks, lead time represents cycles from initial trigger "
-            "to functional breakdown. For active in-service units, it indicates the elapsed monitoring duration since first detection."
+            "📌 **Prognostic Distinction**: In run-to-failure benchmarks (such as C-MAPSS FD001), the final cycle marks actual "
+            "functional breakdown, making this lead time a true early warning period. For in-service or right-censored units, "
+            "this interval reflects the elapsed monitoring window since first detection—not a confirmed time-to-failure."
         )
 
     with tab_sensors:

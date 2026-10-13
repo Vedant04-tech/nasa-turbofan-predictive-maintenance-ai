@@ -108,15 +108,76 @@ def test_validate_and_prepare_data_missing_features_unsolvable():
         validate_and_prepare_data(df, feature_cols=expected)
 
 
-def test_validate_and_prepare_data_inf_and_nan_imputation():
-    """Verify infinite and NaN values are sanitized without throwing exceptions."""
-    df = pd.DataFrame({
-        "id": [1, 1, 1],
-        "cycle": [1, 2, 3],
-        "sensor_2": [10.0, np.inf, np.nan],
+def test_validate_and_prepare_data_inf_and_nan_rejection():
+    """Verify infinite and NaN values in base features are strictly rejected rather than silently corrupted."""
+    df_inf = pd.DataFrame({
+        "id": [1, 1],
+        "cycle": [1, 2],
+        "sensor_2": [10.0, np.inf],
     })
-    expected = ["sensor_2"]
-    prepared, warnings = validate_and_prepare_data(df, feature_cols=expected)
-    assert not np.isinf(prepared["sensor_2"]).any()
-    assert not prepared["sensor_2"].isna().any()
-    assert len(warnings) >= 1
+    with pytest.raises(ValueError, match="infinite values"):
+        validate_and_prepare_data(df_inf, feature_cols=["sensor_2"])
+
+    df_nan = pd.DataFrame({
+        "id": [1, 1],
+        "cycle": [1, 2],
+        "sensor_2": [10.0, np.nan],
+    })
+    with pytest.raises(ValueError, match="missing or NaN values"):
+        validate_and_prepare_data(df_nan, feature_cols=["sensor_2"])
+
+
+def test_validate_and_prepare_data_cycle_1_rolling_std_handling():
+    """Verify legitimate cycle-1 rolling std NaN is imputed with 0.0, while post-cycle-1 NaNs fail."""
+    # Legitimate cycle 1 rolling std NaN
+    df_cycle_1 = pd.DataFrame({
+        "id": [1, 1],
+        "cycle": [1, 2],
+        "sensor_11_rolling_std": [np.nan, 2.5],
+    })
+    prepared, _ = validate_and_prepare_data(
+        df_cycle_1, feature_cols=["sensor_11_rolling_std"]
+    )
+    assert prepared.loc[0, "sensor_11_rolling_std"] == 0.0
+    assert prepared.loc[1, "sensor_11_rolling_std"] == 2.5
+
+    # Illegitimate post-cycle-1 NaN
+    df_corrupt_std = pd.DataFrame({
+        "id": [1, 1],
+        "cycle": [1, 2],
+        "sensor_11_rolling_std": [0.0, np.nan],
+    })
+    with pytest.raises(ValueError, match="beyond initial cycle"):
+        validate_and_prepare_data(
+            df_corrupt_std, feature_cols=["sensor_11_rolling_std"]
+        )
+
+
+def test_validate_and_prepare_data_duplicates_and_invalid_cycles():
+    """Verify duplicate engine cycles and invalid cycle numbers are caught."""
+    # Duplicate record
+    df_dup = pd.DataFrame({
+        "id": [1, 1, 1],
+        "cycle": [1, 2, 2],
+        "sensor_2": [10.0, 11.0, 12.0],
+    })
+    with pytest.raises(ValueError, match="duplicate record"):
+        validate_and_prepare_data(df_dup, feature_cols=["sensor_2"])
+
+    # Non-positive cycle
+    df_invalid_cycle = pd.DataFrame({
+        "id": [1, 1],
+        "cycle": [0, 1],
+        "sensor_2": [10.0, 11.0],
+    })
+    with pytest.raises(ValueError, match="non-positive cycle"):
+        validate_and_prepare_data(df_invalid_cycle, feature_cols=["sensor_2"])
+
+    # Non-finite cycle
+    df_inf_cycle = pd.DataFrame({
+        "id": [1, 1],
+        "cycle": [1, np.inf],
+        "sensor_2": [10.0, 11.0],
+    })
+    with pytest.raises(ValueError, match="non-finite"):
+        validate_and_prepare_data(df_inf_cycle, feature_cols=["sensor_2"])
