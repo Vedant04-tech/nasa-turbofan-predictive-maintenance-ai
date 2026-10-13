@@ -10,6 +10,9 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+build/
+dist/
 
 # Pytest / Caches
 .pytest_cache/
