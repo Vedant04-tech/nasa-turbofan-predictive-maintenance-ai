@@ -123,15 +123,12 @@ def validate_and_prepare_data(
 
     prepared = df.copy()
 
-    # Check for required engine identifier and cycle metadata
+    # Check for required engine identifier and cycle metadata, and validate numeric types
     for req in RAW_METADATA_COLS:
         if req not in prepared.columns:
             raise ValueError(
                 f"Missing required identifier column '{req}'. Dataset must contain 'id' and 'cycle'."
             )
-
-    # Validate numeric types for metadata
-    for req in RAW_METADATA_COLS:
         if not pd.api.types.is_numeric_dtype(prepared[req]):
             try:
                 prepared[req] = pd.to_numeric(prepared[req], errors="coerce")

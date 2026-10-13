@@ -111,24 +111,17 @@ def calculate_early_warning_lead_time(
     anomaly_points = sorted_df[sorted_df[actual_score_col] < threshold]
     anomaly_count = len(anomaly_points)
 
-    if not anomaly_points.empty:
-        first_anomaly = int(anomaly_points[cycle_col].min())
-        lead_time = max(0, max_cycle - first_anomaly)
-        return {
-            "lead_time": lead_time,
-            "first_anomaly_cycle": first_anomaly,
-            "max_cycle": max_cycle,
-            "anomaly_count": anomaly_count,
-            "is_anomalous": True,
-        }
-    else:
-        return {
-            "lead_time": 0,
-            "first_anomaly_cycle": None,
-            "max_cycle": max_cycle,
-            "anomaly_count": 0,
-            "is_anomalous": False,
-        }
+    has_anomaly = not anomaly_points.empty
+    first_anomaly = int(anomaly_points[cycle_col].min()) if has_anomaly else None
+    lead_time = max(0, max_cycle - first_anomaly) if first_anomaly is not None else 0
+
+    return {
+        "lead_time": lead_time,
+        "first_anomaly_cycle": first_anomaly,
+        "max_cycle": max_cycle,
+        "anomaly_count": anomaly_count,
+        "is_anomalous": has_anomaly,
+    }
 
 
 def get_anomaly_summary(
@@ -142,8 +135,8 @@ def get_anomaly_summary(
     lead_info = calculate_early_warning_lead_time(
         engine_df, threshold=threshold, score_col=score_col
     )
-    actual_score_col = score_col if score_col in engine_df.columns else "anomaly_score"
-    scores = engine_df[actual_score_col].to_numpy() if actual_score_col in engine_df.columns else np.array([0.0])
+    col = score_col if score_col in engine_df.columns else "anomaly_score"
+    scores = engine_df[col].to_numpy() if col in engine_df.columns else np.array([0.0])
 
     latest_score = float(scores[-1]) if len(scores) > 0 else 0.0
     min_score = float(np.min(scores)) if len(scores) > 0 else 0.0

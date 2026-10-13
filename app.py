@@ -98,15 +98,27 @@ def get_models():
 
 def find_sample_dataset() -> Optional[Path]:
     """Finds canonical sample dataset path across standard locations."""
-    candidates = [
+    for path in [
         Path(__file__).resolve().parent / "data" / "samples" / "engine_samples.csv",
         Path.cwd() / "data" / "samples" / "engine_samples.csv",
-        Path.cwd() / "engine_samples.csv",
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
+    ]:
+        if path.exists():
+            return path
     return None
+
+
+def _render_kpi_card(col, title: str, value: str, subtext: str, val_class: str = "") -> None:
+    """Renders a styled KPI metric card inside a Streamlit column."""
+    col.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-title">{title}</div>
+            <div class="metric-value {val_class}">{value}</div>
+            <div class="subtext">{subtext}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # --------------------------------------------------
@@ -165,7 +177,7 @@ def main():
             except Exception as e:
                 st.sidebar.error(f"Failed to read CSV: {e}")
     else:
-        if sample_file_path and sample_file_path.exists():
+        if sample_file_path:
             try:
                 raw_df = pd.read_csv(sample_file_path)
                 st.sidebar.success(f"✓ Benchmark dataset loaded ({len(raw_df)} cycles)")
@@ -229,7 +241,7 @@ def main():
     engine_df = prepared_df[prepared_df["id"] == selected_engine].sort_values("cycle").reset_index(drop=True)
     summary = get_anomaly_summary(engine_df, threshold=threshold, score_col="Anomaly_Score")
 
-    latest_cycle = int(engine_df["cycle"].iloc[-1])
+    latest_cycle = summary["max_cycle"]
     latest_rul = float(engine_df["Predicted_RUL"].iloc[-1])
     latest_score = float(summary["latest_score"])
     lead_time = int(summary["lead_time"])
@@ -238,55 +250,39 @@ def main():
     # 5. KPI Summary Cards
     col1, col2, col3, col4 = st.columns(4)
 
-    with col1:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">Remaining Useful Life</div>
-                <div class="metric-value">{int(latest_rul)} <span style="font-size:16px;color:#94a3b8;">cycles</span></div>
-                <div class="subtext">Current Cycle: #{latest_cycle}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col2:
-        score_color_class = "status-critical" if latest_score < threshold else "status-normal"
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">Anomaly Decision Score</div>
-                <div class="metric-value {score_color_class}">{latest_score:+.3f}</div>
-                <div class="subtext">Cutoff Boundary: {threshold:+.2f}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col3:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">Early Warning Lead Time</div>
-                <div class="metric-value">{lead_time} <span style="font-size:16px;color:#94a3b8;">cycles</span></div>
-                <div class="subtext">{"First Trigger: Cycle #" + str(summary['first_anomaly_cycle']) if summary['first_anomaly_cycle'] else "No Anomaly Triggered"}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col4:
-        status_class = "status-critical" if status == "HIGH RISK" else "status-normal"
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">Health Status</div>
-                <div class="metric-value {status_class}">{status}</div>
-                <div class="subtext">{summary['anomaly_count']} anomaly cycles detected</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    _render_kpi_card(
+        col1,
+        "Remaining Useful Life",
+        f"{int(latest_rul)} <span style='font-size:16px;color:#94a3b8;'>cycles</span>",
+        f"Current Cycle: #{latest_cycle}",
+    )
+    score_cls = "status-critical" if latest_score < threshold else "status-normal"
+    _render_kpi_card(
+        col2,
+        "Anomaly Decision Score",
+        f"{latest_score:+.3f}",
+        f"Cutoff Boundary: {threshold:+.2f}",
+        score_cls,
+    )
+    trigger_desc = (
+        f"First Trigger: Cycle #{summary['first_anomaly_cycle']}"
+        if summary["first_anomaly_cycle"]
+        else "No Anomaly Triggered"
+    )
+    _render_kpi_card(
+        col3,
+        "Early Warning Lead Time",
+        f"{lead_time} <span style='font-size:16px;color:#94a3b8;'>cycles</span>",
+        trigger_desc,
+    )
+    status_cls = "status-critical" if status == "HIGH RISK" else "status-normal"
+    _render_kpi_card(
+        col4,
+        "Health Status",
+        status,
+        f"{summary['anomaly_count']} anomaly cycles detected",
+        status_cls,
+    )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
