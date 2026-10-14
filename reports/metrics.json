@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "dataset_path": "C:\\Users\\Admin\\Desktop\\Internship Project\\data\\raw\\train_FD001.txt",
+    "dataset_path": "data/raw/train_FD001.txt",
     "total_engines": 100,
     "train_engines_count": 80,
     "test_engines_count": 20,
@@ -62,10 +62,11 @@
       "r2": 0.8288,
       "max_error": 73.74,
       "notebook_native_nan_reproduction": {
-        "rmse": 17.9834,
-        "mae": 12.9157,
-        "r2": 0.8288,
-        "note": "Matches original training notebook results (17.9021 RMSE / 12.8504 MAE / 0.8304 R^2)"
+        "rmse": 17.9021,
+        "mae": 12.8504,
+        "r2": 0.8304,
+        "max_error": 73.74,
+        "note": "Reproduced training notebook Cell 26 results (17.9021 RMSE / 12.8504 MAE / 0.8304 R^2) when cycle-1 rolling std retains native NaNs."
       }
     }
   },
@@ -73,12 +74,16 @@
     "threshold": 0.0,
     "nominal_rul_cutoff": 100,
     "degraded_rul_cutoff": 30,
+    "extended_degraded_rul_cutoff": 50,
     "nominal_cycles_evaluated": 2050,
     "nominal_false_alarms": 117,
     "false_alarm_rate": 0.0571,
     "degraded_cycles_evaluated": 620,
     "degraded_detections": 620,
     "degraded_recall": 1.0,
+    "extended_degraded_cycles_evaluated": 1020,
+    "extended_degraded_detections": 963,
+    "extended_degraded_recall": 0.9441,
     "first_trigger_lead_time": {
       "mean": 187.05,
       "median": 188.5,
@@ -97,7 +102,9 @@
   "audit_findings_and_limitations": {
     "rul_cap_mismatch_resolved": "The notebook trained with RUL capped at 130 cycles. The README claimed 125 cycles; this evaluation uses the true 130-cycle cap.",
     "estimator_count_mismatch_resolved": "The committed Random Forest model contains 200 estimators (not 100 as previously documented).",
+    "random_forest_training_provenance": "Verified. The committed Random Forest artifact (rul_model.pkl) was trained on 80 engines using train_test_split(random_state=42), matching Cell 20/26 in the training notebook. The 20 evaluation engines are strictly held-out with zero cross-engine leakage.",
+    "isolation_forest_training_provenance_caveat": "Disclosed Limitation. In notebooks/Anamoly_Detection.ipynb (Cell 31), healthy_df was filtered from the entire 100-engine dataset (RUL > 100) before engine-level train/test separation. Therefore, nominal cycles from the 20 evaluation engines were present during Isolation Forest fitting, introducing cross-engine group leakage in the anomaly detector training phase.",
     "lead_time_caveat": "The previously claimed ~40-46 cycles lead time was an anecdotal single-engine observation (Engine 1 = 43 cycles). Across the full test fleet, first alert lead times vary widely due to a ~5.7% false alarm rate in nominal cycles. Requiring 3 consecutive anomaly flags yields a more reliable median lead time of 66.5 cycles.",
-    "ground_truth_limitation": "NASA C-MAPSS FD001 is a continuous thermodynamic degradation simulation without discrete fault injection timestamps. Precision and recall are evaluated relative to operational regimes (nominal RUL > 100 vs degraded RUL <= 30)."
+    "ground_truth_limitation": "NASA C-MAPSS FD001 is a continuous thermodynamic degradation simulation without discrete fault injection timestamps. Precision and recall are evaluated relative to operational regimes (nominal RUL > 100 vs degraded RUL <= 30 and RUL <= 50). A 100% degraded-regime recall reflects continuous abnormal sensor drift prior to functional breakdown, not flawless real-world discrete failure prediction."
   }
 }

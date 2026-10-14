@@ -167,17 +167,20 @@ def evaluate_anomaly_detection_performance(
     rul_col: str = "RUL",
     nominal_rul_cutoff: int = 100,
     degraded_rul_cutoff: int = 30,
+    extended_degraded_rul_cutoff: int = 50,
 ) -> Dict[str, Any]:
     """
     Evaluates unsupervised anomaly detection performance independently against operational regimes.
 
     Because run-to-failure benchmarks lack discrete ground-truth labels for anomaly
-    injection, this function calculates objective metrics across two defined operating regimes:
+    injection, this function calculates objective metrics across defined operating regimes:
     1. Nominal Regime (RUL > nominal_rul_cutoff): Measures the False Alarm Rate (FAR), where
        scores below the threshold represent premature false alerts.
-    2. Degraded Regime (RUL <= degraded_rul_cutoff): Measures Detection Recall, where scores
-       below the threshold represent successful degradation detection prior to failure.
-    3. Fleet-wide Lead Time Distribution: Tracks the first alert cycle and sustained alert cycles
+    2. Degraded Regime (RUL <= degraded_rul_cutoff): Measures Critical Detection Recall, where
+       scores below the threshold represent degradation detection prior to imminent failure.
+    3. Extended Degraded Regime (RUL <= extended_degraded_rul_cutoff): Measures broader degradation
+       detection recall in earlier degradation phases (default: RUL <= 50).
+    4. Fleet-wide Lead Time Distribution: Tracks the first alert cycle and sustained alert cycles
        (3 consecutive cycles) per engine, reporting min, median, mean, max, and std.
 
     Parameters
@@ -196,6 +199,8 @@ def evaluate_anomaly_detection_performance(
         Cutoff RUL above which cycles are considered nominal baseline (default: 100).
     degraded_rul_cutoff : int, optional
         Cutoff RUL below which cycles are in the critical degradation phase (default: 30).
+    extended_degraded_rul_cutoff : int, optional
+        Cutoff RUL for broader degradation phase evaluation (default: 50).
 
     Returns
     -------
@@ -236,6 +241,13 @@ def evaluate_anomaly_detection_performance(
     degraded_detections = int(eval_df.loc[degraded_mask, "is_anomaly"].sum())
     degraded_recall = (
         round(degraded_detections / degraded_total, 4) if degraded_total > 0 else 0.0
+    )
+
+    extended_mask = eval_df[rul_col] <= extended_degraded_rul_cutoff
+    extended_total = int(extended_mask.sum())
+    extended_detections = int(eval_df.loc[extended_mask, "is_anomaly"].sum())
+    extended_recall = (
+        round(extended_detections / extended_total, 4) if extended_total > 0 else 0.0
     )
 
     # 2. Fleet lead-time distribution across engines
@@ -280,12 +292,16 @@ def evaluate_anomaly_detection_performance(
         "threshold": threshold,
         "nominal_rul_cutoff": nominal_rul_cutoff,
         "degraded_rul_cutoff": degraded_rul_cutoff,
+        "extended_degraded_rul_cutoff": extended_degraded_rul_cutoff,
         "nominal_cycles_evaluated": nominal_total,
         "nominal_false_alarms": nominal_false_alarms,
         "false_alarm_rate": false_alarm_rate,
         "degraded_cycles_evaluated": degraded_total,
         "degraded_detections": degraded_detections,
         "degraded_recall": degraded_recall,
+        "extended_degraded_cycles_evaluated": extended_total,
+        "extended_degraded_detections": extended_detections,
+        "extended_degraded_recall": extended_recall,
         "first_trigger_lead_time": _summarize_leads(first_trigger_leads),
         "sustained_3_lead_time": _summarize_leads(sustained_3_leads),
     }

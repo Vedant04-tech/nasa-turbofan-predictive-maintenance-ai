@@ -133,6 +133,7 @@ def test_evaluate_anomaly_detection_performance_regimes():
         threshold=0.0,
         nominal_rul_cutoff=5,
         degraded_rul_cutoff=2,
+        extended_degraded_rul_cutoff=3,
     )
 
     # Nominal cycles (RUL > 5): cycles 1, 2, 3, 4 (RUL 9, 8, 7, 6) -> 4 cycles
@@ -146,6 +147,11 @@ def test_evaluate_anomaly_detection_performance_regimes():
     # Cycles 9 and 10 have scores -0.2 and -0.3 -> 2 detections
     assert results["degraded_detections"] == 2
     assert results["degraded_recall"] == pytest.approx(0.6667, abs=1e-4)
+
+    # Extended degraded cycles (RUL <= 3): cycles 7, 8, 9, 10 -> 4 cycles (2 detections)
+    assert results["extended_degraded_cycles_evaluated"] == 4
+    assert results["extended_degraded_detections"] == 2
+    assert results["extended_degraded_recall"] == 0.50
 
     # First trigger lead time: max_cycle is 10, first anomaly at cycle 2 -> lead = 8
     assert results["first_trigger_lead_time"]["mean"] == 8.0
@@ -208,3 +214,49 @@ def test_evaluate_regressors_pipeline_mock():
     assert results["random_forest_regressor"]["rmse"] == pytest.approx(1.0)
     assert len(y_test) == 2
     assert len(y_pred_rf) == 2
+
+
+def test_metrics_json_integrity_and_portability():
+    """Verify generated metrics.json contains portable metadata and valid evaluation structures."""
+    import json
+    from pathlib import Path
+
+    report_path = Path(__file__).resolve().parent.parent / "reports" / "metrics.json"
+    if not report_path.exists():
+        pytest.skip("reports/metrics.json not generated yet")
+
+    with open(report_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # 1. Portable metadata check: must not contain absolute machine paths
+    dataset_path = data["metadata"]["dataset_path"]
+    assert not dataset_path.startswith("C:"), f"Machine-specific Windows path found: {dataset_path}"
+    assert "\\" not in dataset_path, f"Non-portable path separators found: {dataset_path}"
+    assert data["metadata"]["rul_cap"] == 130
+    assert data["metadata"]["total_engines"] == 100
+    assert data["metadata"]["test_engines_count"] == 20
+
+    # 2. Regression metrics integrity
+    rf = data["regression_evaluation"]["random_forest_regressor"]
+    assert rf["n_estimators"] == 200
+    assert rf["rmse"] == pytest.approx(17.9834, abs=1e-3)
+    assert rf["mae"] == pytest.approx(12.9157, abs=1e-3)
+
+    if "notebook_native_nan_reproduction" in rf:
+        rep = rf["notebook_native_nan_reproduction"]
+        assert rep["rmse"] == pytest.approx(17.9021, abs=1e-3)
+        assert rep["mae"] == pytest.approx(12.8504, abs=1e-3)
+
+    # 3. Anomaly detection metrics integrity
+    anom = data["anomaly_detection_evaluation"]
+    assert anom["false_alarm_rate"] == pytest.approx(0.0571, abs=1e-3)
+    assert anom["degraded_recall"] == 1.0
+    assert anom["extended_degraded_recall"] == pytest.approx(0.9441, abs=1e-3)
+    assert anom["first_trigger_lead_time"]["median"] == 188.5
+    assert anom["sustained_3_lead_time"]["median"] == 66.5
+
+    # 4. Audit provenance disclosures
+    audit = data["audit_findings_and_limitations"]
+    assert "random_forest_training_provenance" in audit
+    assert "isolation_forest_training_provenance_caveat" in audit
+    assert "lead_time_caveat" in audit
