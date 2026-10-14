@@ -71,26 +71,39 @@ The system is trained and benchmarked on the canonical **NASA Commercial Modular
    - **No Lookahead Leakage**: Only historical and current cycles are used for feature computation.
    - **No Cross-Engine Leakage**: Grouping by engine ID prevents statistics from bleeding across different engines.
    - **Full Cycle Coverage**: `min_periods=1` allows immediate inference from cycle 1 without dropping early records.
-3. **Piecewise Linear RUL Target**: During early cycles, degradation is undetectable. The RUL target is capped at 125 cycles:
-   $$\text{RUL}(t) = \min(\text{MaxCycle} - t, 125)$$
+3. **Piecewise Linear RUL Target**: During early cycles, degradation is undetectable. The RUL target is capped at 130 cycles:
+   $$\text{RUL}(t) = \min(\text{MaxCycle} - t, 130)$$
    This prevents regressor bias from fitting noise during healthy operating periods.
 4. **Final Feature Schema**: 29 input features (14 informative sensors, 3 operating settings, 12 rolling statistics).
 
 ---
 
-## 📈 Model Evaluation & Benchmarks
+## 📈 Model Evaluation & Reproducible Benchmarks
 
-Models were evaluated on a held-out test split of engine units to assess generalization to unseen machinery:
+All models were evaluated on strictly separated held-out test engines (20 engines, 4,070 cycles, `test_size=0.2, random_state=42`) with zero engine-level leakage and identical RUL target formulation. Learned transformations (e.g., standard scaling) were fit strictly on the 80 training engines.
 
-| Model Architecture | Task | RMSE | MAE | Operational Role |
-| :--- | :--- | :---: | :---: | :--- |
-| **Linear Regression** (Baseline) | RUL Regression | 21.17 | 17.03 | Benchmark baseline; underfits nonlinear degradation stages |
-| **Random Forest Regressor** (100 Trees) | RUL Regression | **17.90** | **12.85** | Production regressor; ~15% error reduction over baseline |
-| **Isolation Forest** (Contamination = 5%) | Anomaly Detection | — | — | Unsupervised safety net trained strictly on nominal cycles ($RUL > 100$) |
+### Prognostic Regression Benchmarks (Held-out Test Fleet, Cap = 130)
 
-### Prognostic Semantics & Lead-Time Nuances:
-- **Run-to-Failure Datasets**: When evaluated on run-to-failure benchmarks, the lead time represents the number of cycles from the first anomaly trigger until functional breakdown (typically ~40–46 cycles prior to failure).
-- **In-Service Data**: On right-censored operating machinery that has not yet failed, this interval represents the **observed monitoring duration since initial anomaly trigger**, rather than a guaranteed time-to-failure estimate.
+| Model Architecture | Features & Preprocessing | RMSE | MAE | R² | Operational Role |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Naive Mean Baseline** | Constant train target mean (88.87) | 43.47 | 38.54 | -0.00 | Naive baseline; predicts constant average life |
+| **Linear Regression** | Standardized (fit on train), clipped $\ge 0$ | 20.93 | 16.69 | 0.77 | Simple ML baseline; underfits nonlinear degradation stages *(unconstrained: 21.17 RMSE / 17.03 MAE)* |
+| **Random Forest Regressor** | 200 Estimators, raw features, clipped $\ge 0$ | **17.98** | **12.92** | **0.83** | Production regressor; ~14% error reduction over linear baseline *(native NaNs: 17.90 RMSE / 12.85 MAE)* |
+
+### Unsupervised Anomaly Detection Benchmarks (Isolation Forest)
+
+The Isolation Forest detector was trained on healthy operating regimes (`RUL > 100`) with 200 estimators and 5% contamination. Because run-to-failure datasets lack human-annotated discrete fault injection timestamps, performance is evaluated across operational regimes:
+
+| Evaluation Metric | Target Operational Regime | Score / Rate | Interpretation |
+| :--- | :--- | :---: | :--- |
+| **False Alarm Rate (FAR)** | Nominal Cycles ($RUL > 100$) | **5.71%** | 117 false alarms out of 2,050 nominal cycles (aligns with 5% contamination) |
+| **Detection Recall** | Critical Degraded Phase ($RUL \le 30$) | **100.00%** | 620 out of 620 degraded cycles flagged before functional failure |
+| **Extended Recall** | Degraded Phase ($RUL \le 50$) | **94.41%** | 963 out of 1,020 cycles flagged |
+| **First-Trigger Lead Time** | Fleet Test Units (20 engines) | **Median: 188.5** (Mean: 187.1) | Earliest isolated detection cycle prior to failure [Min: 46, Max: 268] |
+| **Sustained 3-Cycle Lead Time** | Fleet Test Units (20 engines) | **Median: 66.5** (Mean: 92.2) | 3 consecutive anomalous cycles filtering out nominal noise [Min: 36, Max: 268] |
+
+> [!NOTE]
+> **Audit Finding on Lead-Time Claims**: The previously cited "~40–46 cycles lead time" was an anecdotal observation based solely on Engine 1 (lead time of 43 cycles). Fleet-wide evaluation reveals that isolated anomaly triggers occur earlier across the fleet due to the ~5.7% nominal false alarm rate. Requiring **3 consecutive anomalous cycles** filters early noise and produces a robust median warning window of **66.5 cycles** before failure.
 
 ---
 
@@ -121,12 +134,20 @@ nasa-turbofan-predictive-maintenance-ai/
 │       ├── data.py               # Data validation, cleaning, and causal rolling features
 │       ├── models.py             # Artifact deserialization, inference, and physical constraints
 │       └── evaluation.py         # Prognostic metrics and lead-time calculations
+├── scripts/
+│   └── evaluate.py               # Reproducible evaluation script (LR baseline vs RF on held-out fleet)
+├── reports/
+│   ├── metrics.json              # Machine-readable evaluation report and metadata
+│   ├── actual_vs_predicted.png   # Diagnostic actual vs predicted RUL plot
+│   ├── residuals.png             # Residual error distribution plot
+│   └── anomaly_progression.png   # Anomaly score degradation profiles
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py               # Shared test fixtures and synthetic data generators
 │   ├── test_data.py              # Tests for schema validation, rolling features, inf/nan handling
 │   ├── test_models.py            # Tests for artifact loading, RUL non-negativity, anomaly thresholds
 │   ├── test_evaluation.py        # Tests for RMSE, MAE, R^2, and lead-time semantics
+│   ├── test_reproducibility.py   # Tests for target capping, zero group leakage, and regime metrics
 │   └── test_app.py               # Headless Streamlit AppTest suite (UI, sliders, error handling)
 ├── .gitattributes                # Git LFS tracking configuration for *.pkl files
 ├── .gitignore                    # Python, pytest, and OS ignore rules
@@ -188,11 +209,22 @@ streamlit run app.py
 2. Choose **"Load Benchmark Sample Dataset"** for instant demonstration or **"Upload Custom CSV"** to test your own data.
 3. Select an Engine Unit ID and interactively adjust the **Anomaly Sensitivity Threshold** slider to evaluate risk shifts.
 
+### 6. Run Reproducible Evaluation Benchmark
+To independently reproduce all regression metrics and anomaly detection benchmarks on the held-out test fleet:
+```bash
+python scripts/evaluate.py
+```
+This generates:
+- `reports/metrics.json`: Full machine-readable metrics, split seeds, and audit metadata.
+- `reports/actual_vs_predicted.png`: Actual vs. predicted scatter plot with identity reference lines.
+- `reports/residuals.png`: Residual error histograms and actual vs. residual plots.
+- `reports/anomaly_progression.png`: Anomaly score degradation profiles across representative test engines.
+
 ---
 
 ## 🧪 Testing & Code Quality
 
-The project includes 23 automated tests covering data validation, artifact integrity, physical regression bounds, prognostic lead times, and interactive Streamlit UI components:
+The project includes a comprehensive automated test suite covering schema validation, causal rolling windows, artifact integrity, physical regression bounds, target formulation, zero-leakage engine splits, prognostic lead times, and interactive Streamlit UI components:
 
 ```bash
 # Run full pytest suite

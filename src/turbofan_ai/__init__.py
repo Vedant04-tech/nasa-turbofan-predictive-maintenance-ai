@@ -10,12 +10,14 @@ from turbofan_ai.data import (
     LOW_VARIANCE_SENSORS,
     RAW_METADATA_COLS,
     ROLLING_SENSORS,
+    add_piecewise_rul_target,
     compute_rolling_features,
     validate_and_prepare_data,
 )
 from turbofan_ai.evaluation import (
     calculate_early_warning_lead_time,
     compute_regression_metrics,
+    evaluate_anomaly_detection_performance,
     get_anomaly_summary,
 )
 from turbofan_ai.models import (
@@ -30,6 +32,7 @@ __all__ = [
     "LOW_VARIANCE_SENSORS",
     "RAW_METADATA_COLS",
     "ROLLING_SENSORS",
+    "add_piecewise_rul_target",
     "compute_rolling_features",
     "validate_and_prepare_data",
     "load_model_artifacts",
@@ -37,5 +40,6 @@ __all__ = [
     "predict_rul",
     "calculate_early_warning_lead_time",
     "compute_regression_metrics",
+    "evaluate_anomaly_detection_performance",
     "get_anomaly_summary",
 ]

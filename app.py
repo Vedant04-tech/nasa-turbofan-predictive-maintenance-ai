@@ -193,11 +193,11 @@ def main():
     with st.sidebar.expander("ℹ️ Model Architecture & Specs"):
         st.markdown(
             f"""
-            - **RUL Regressor**: Random Forest (100 Estimators)
-            - **Anomaly Detector**: Isolation Forest (Contamination=0.05)
+            - **RUL Regressor**: Random Forest (200 Estimators)
+            - **Anomaly Detector**: Isolation Forest (200 Estimators, Contamination=0.05)
             - **Total Input Features**: {len(feature_cols)}
             - **Causal Rolling Window**: 5 cycles
-            - **Target Capping**: RUL capped at 125 cycles
+            - **Target Capping**: RUL capped at 130 cycles
             """
         )
 

@@ -91,6 +91,53 @@ def compute_rolling_features(
     return df
 
 
+def add_piecewise_rul_target(
+    df: pd.DataFrame,
+    rul_cap: Optional[int] = 130,
+) -> pd.DataFrame:
+    """
+    Computes piece-wise linear Remaining Useful Life (RUL) target for run-to-failure engines.
+
+    In NASA C-MAPSS FD001, initial degradation is undetectable. The RUL is therefore
+    formulated with a constant plateau during early healthy operating cycles, capped at
+    a threshold (e.g. 130 cycles), and decreases linearly toward 0 at failure:
+        RUL(t) = min(max_cycle - t, rul_cap)
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing engine telemetry with 'id' and 'cycle' columns.
+    rul_cap : int, optional
+        Maximum RUL threshold for piece-wise degradation clipping (default: 130).
+        If None, uncapped linear RUL is computed.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with added 'RUL' column.
+
+    Raises
+    ------
+    ValueError
+        If 'id' or 'cycle' columns are missing or if rul_cap is non-positive.
+    """
+    if "id" not in df.columns or "cycle" not in df.columns:
+        raise ValueError("Dataset must contain 'id' and 'cycle' columns to compute RUL.")
+
+    if rul_cap is not None and rul_cap <= 0:
+        raise ValueError(f"rul_cap must be a positive integer, got {rul_cap}")
+
+    df = df.copy()
+    max_cycles = df.groupby("id")["cycle"].transform("max")
+    rul = max_cycles - df["cycle"]
+
+    if rul_cap is not None:
+        rul = np.minimum(rul, rul_cap)
+
+    df["RUL"] = rul
+    return df
+
+
 def validate_and_prepare_data(
     df: pd.DataFrame,
     feature_cols: Optional[List[str]] = None,
